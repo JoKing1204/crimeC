@@ -142,7 +142,7 @@ public class Main {
                         System.out.print("Enter return count: ");
                         int return_count = scanner.nextInt();
                         insertCriminalData(conn, fName, age, status, address, date_admission, crimeID, return_count);
-                        System.out.println("Inserting criminal information."); // Debugging output
+                        System.out.println("Inserting criminal information"); // Debugging output
 
                         break;
                     case 2:
@@ -153,8 +153,8 @@ public class Main {
                         System.out.print("Enter criminal ID to update: ");
                         long criminalIDToUpdate = scanner.nextLong();
                         scanner.nextLine(); // Consume newline
-                        System.out.println("Updating criminal information");
                         updateCriminalData(conn, criminalIDToUpdate);
+                        System.out.println("Updating criminal information");
                         break;
                     case 4:
                         if (currentUser != null && currentUser.status) {
@@ -169,6 +169,8 @@ public class Main {
                         String searchName = scanner.nextLine();
                         searchCriminalByName(conn, searchName);
                         System.out.println("Searching for criminal "); // Debugging output
+                        break;
+                    case 0:
                         break;
                     default:
                         System.out.println("Invalid choice. Please enter a valid option.");
