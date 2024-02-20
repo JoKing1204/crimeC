@@ -173,7 +173,6 @@ public class Main {
                         break;
                     case 6:
                         searchCrimeById(conn);
-                        System.out.println("Searching for crime ");
                         break;
                     case 0:
                         break;
