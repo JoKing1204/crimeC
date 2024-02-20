@@ -119,6 +119,7 @@ public class Main {
                 System.out.println("3. Update criminal data");
                 System.out.println("4. Add new user");
                 System.out.println("5. Search criminal by name");
+                System.out.println("6. Search crime by ID");
                 System.out.println("0. Exit");
                 System.out.print("Enter your choice: ");
                 choice = scanner.nextInt();
@@ -142,7 +143,7 @@ public class Main {
                         System.out.print("Enter return count: ");
                         int return_count = scanner.nextInt();
                         insertCriminalData(conn, fName, age, status, address, date_admission, crimeID, return_count);
-                        System.out.println("Inserting criminal information"); // Debugging output
+                        System.out.println("Inserting criminal information");
 
                         break;
                     case 2:
@@ -168,7 +169,11 @@ public class Main {
                         System.out.print("Enter the name of the criminal to search: ");
                         String searchName = scanner.nextLine();
                         searchCriminalByName(conn, searchName);
-                        System.out.println("Searching for criminal "); // Debugging output
+                        System.out.println("Searching for criminal ");
+                        break;
+                    case 6:
+                        searchCrimeById(conn);
+                        System.out.println("Searching for crime ");
                         break;
                     case 0:
                         break;
@@ -217,6 +222,32 @@ public class Main {
             throw new SQLException("Error creating tables", se);
         }
     }
+
+    private static void searchCrimeById(Connection conn) {
+        try {
+            System.out.print("Enter crime ID to search: ");
+            int crimeId = scanner.nextInt();
+            scanner.nextLine();
+
+            String searchSQL = "SELECT * FROM CrimeDatabase WHERE id = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(searchSQL)) {
+                pstmt.setInt(1, crimeId);
+
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        String crime = rs.getString("crime");
+                        System.out.println("Crime ID: " + crimeId);
+                        System.out.println("Crime Description: " + crime);
+                    } else {
+                        System.out.println("No crime found with ID: " + crimeId);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Error searching crime by ID", e);
+        }
+    }
+
     private static void searchCriminalByName(Connection conn, String searchName) throws SQLException {
         String searchSQL = "SELECT * FROM criminals WHERE fName = ?";
         try (PreparedStatement pstmt = conn.prepareStatement(searchSQL)) {
