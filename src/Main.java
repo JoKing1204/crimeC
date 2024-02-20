@@ -10,7 +10,7 @@ public class Main {
     static final String JDBC_DRIVER = "org.postgresql.Driver";
     static final String DB_URL = "jdbc:postgresql://localhost/crimev";
     static final String USER = "postgres";
-    static final String PASS = "0212";
+    static final String PASS = "0928";
     static class User {
         String username;
         String password;
@@ -68,19 +68,38 @@ public class Main {
         System.out.print("Enter password: ");
         String password = scanner.nextLine();
 
-        for (User user : users) {
-            if (user.username.equals(username) && user.password.equals(password)) {
-                if (user.status) {
-                    currentUser = user;
-                    return true;
-                } else {
-                    System.out.println("Your account is not active. Please contact an administrator.");
-                    return false;
-                }
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+
+        try {
+            conn = DriverManager.getConnection(DB_URL, USER, PASS);
+            String sql = "SELECT fName, clearance_status FROM UserClearance WHERE fName = ? AND password = ?";
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, username);
+            pstmt.setString(2, password);
+            rs = pstmt.executeQuery();
+            if (rs.next()) {
+                String fName = rs.getString("fName");
+                boolean clearance_status = rs.getBoolean("clearance_status");
+                currentUser = new User(username, password, clearance_status); // Corrected line
+                return true;
+            } else {
+                System.out.println("Incorrect username or password. Please try again.");
+                return false;
+            }
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "SQL Error", e);
+            return false;
+        } finally {
+            try {
+                if (rs != null) rs.close();
+                if (pstmt != null) pstmt.close();
+                if (conn != null) conn.close();
+            } catch (SQLException e) {
+                logger.log(Level.SEVERE, "Error closing resources", e);
             }
         }
-        System.out.println("Incorrect username or password. Please try again.");
-        return false;
     }
     private static void startCRUD() {
         Connection conn = null;
@@ -98,9 +117,12 @@ public class Main {
                 System.out.println("1. Insert criminal data");
                 System.out.println("2. Read criminal data");
                 System.out.println("3. Update criminal data");
+                System.out.println("4. Add new user");
+                System.out.println("5. Search criminal by name");
                 System.out.println("0. Exit");
                 System.out.print("Enter your choice: ");
                 choice = scanner.nextInt();
+                scanner.nextLine();
                 switch (choice) {
                     case 1:
                         scanner.nextLine(); // Consume newline
@@ -120,19 +142,33 @@ public class Main {
                         System.out.print("Enter return count: ");
                         int return_count = scanner.nextInt();
                         insertCriminalData(conn, fName, age, status, address, date_admission, crimeID, return_count);
+                        System.out.println("Inserting criminal information."); // Debugging output
+
                         break;
                     case 2:
+                        System.out.println("Gathering all criminal information");
                         readCriminalData(conn);
                         break;
                     case 3:
                         System.out.print("Enter criminal ID to update: ");
                         long criminalIDToUpdate = scanner.nextLong();
                         scanner.nextLine(); // Consume newline
-                        System.out.print("Enter new status: ");
-                        String newStatus = scanner.nextLine();
-                        updateCriminalData(conn, criminalIDToUpdate, newStatus);
+                        System.out.println("Updating criminal information");
+                        updateCriminalData(conn, criminalIDToUpdate);
                         break;
-                    case 0:
+                    case 4:
+                        if (currentUser != null && currentUser.status) {
+                            addUser(conn);
+                        } else {
+                            System.out.println("You don't have permission to add a new user.");
+                        }
+
+                        break;
+                    case 5:
+                        System.out.print("Enter the name of the criminal to search: ");
+                        String searchName = scanner.nextLine();
+                        searchCriminalByName(conn, searchName);
+                        System.out.println("Searching for criminal "); // Debugging output
                         break;
                     default:
                         System.out.println("Invalid choice. Please enter a valid option.");
@@ -179,6 +215,73 @@ public class Main {
             throw new SQLException("Error creating tables", se);
         }
     }
+    private static void searchCriminalByName(Connection conn, String searchName) throws SQLException {
+        String searchSQL = "SELECT * FROM criminals WHERE fName = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(searchSQL)) {
+            pstmt.setString(1, searchName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    long criminalID = rs.getLong("criminalID");
+                    String fName = rs.getString("fName");
+                    int age = rs.getInt("age");
+                    String status = rs.getString("status");
+                    String address = rs.getString("address");
+                    Date date_admission = rs.getDate("date_admission");
+                    long crimeID = rs.getLong("crimeID");
+                    int return_count = rs.getInt("return_count");
+                    logger.info("Criminal ID: " + criminalID + ", First Name: " + fName +
+                            ", Age: " + age + ", Status: " + status +
+                            ", Address: " + address + ", Date Admission: " + date_admission +
+                            ", Crime ID: " + crimeID + ", Return Count: " + return_count);
+                } else {
+                    System.out.println("No criminal found with the specified name.");
+                }
+            }
+        } catch (SQLException se) {
+            throw new SQLException("Error searching criminal by name", se);
+        }
+    }
+
+
+    private static void readUsersData(Connection conn) throws SQLException {
+        String selectUsersSQL = "SELECT fName, clearance_status FROM UserClearance";
+        try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(selectUsersSQL)) {
+            System.out.println("Users Data:");
+            System.out.println("Username\tStatus");
+            while (rs.next()) {
+                String username = rs.getString("fName");
+                boolean status = rs.getBoolean("clearance_status");
+                System.out.println(username + "\t\t" + (status ? "Active" : "Inactive"));
+            }
+        } catch (SQLException se) {
+            throw new SQLException("Error reading users data", se);
+        }
+    }
+    private static void addUser(Connection conn) throws SQLException {
+        System.out.println("Enter new username:");
+        String newUsername = scanner.nextLine();
+        System.out.println("Enter new password:");
+        String newPassword = scanner.nextLine();
+        System.out.println("Enter new status (true/false):");
+        boolean newStatus = scanner.nextBoolean();
+        scanner.nextLine(); // Consume newline
+
+        // Insert new user into the database
+        String insertUserSQL = "INSERT INTO UserClearance (fName, password, clearance_status) VALUES (?, ?, ?)";
+        try (PreparedStatement pstmt = conn.prepareStatement(insertUserSQL)) {
+            pstmt.setString(1, newUsername);
+            pstmt.setString(2, newPassword);
+            pstmt.setBoolean(3, newStatus);
+            int rowsAffected = pstmt.executeUpdate();
+            if (rowsAffected > 0) {
+                System.out.println("New user added successfully.");
+            } else {
+                System.out.println("Failed to add new user.");
+            }
+        } catch (SQLException se) {
+            throw new SQLException("Error adding new user", se);
+        }
+    }
 
     private static void insertCriminalData(Connection conn, String fName, int age, String status, String address,
                                            String date_admission, long crimeID, int return_count) throws SQLException {
@@ -221,22 +324,48 @@ public class Main {
         }
     }
 
-    private static void updateCriminalData(Connection conn, long criminalID, String newStatus) throws SQLException {
-        String updateSQL = "UPDATE criminals SET status = ? WHERE criminalID = ?";
-        try (PreparedStatement pstmt = conn.prepareStatement(updateSQL)) {
-            pstmt.setString(1, newStatus);
-            pstmt.setLong(2, criminalID);
-            int affectedRows = pstmt.executeUpdate();
-            if (affectedRows > 0) {
-                logger.info("Criminal data updated successfully.");
-            } else {
-                logger.warning("No criminal found with the provided ID.");
+    private static void updateCriminalData(Connection conn, long criminalID) throws SQLException {
+        try {
+            Scanner scanner = new Scanner(System.in);
+            System.out.print("Enter criminal's first name: ");
+            String fName = scanner.nextLine();
+            System.out.print("Enter criminal's age: ");
+            int age = scanner.nextInt();
+            scanner.nextLine(); // Consume newline
+            System.out.print("Enter criminal's status: ");
+            String status = scanner.nextLine();
+            System.out.print("Enter criminal's address: ");
+            String address = scanner.nextLine();
+            System.out.print("Enter date of admission (YYYY-MM-DD): ");
+            String date_admission = scanner.nextLine();
+            System.out.print("Enter crime ID: ");
+            long crimeID = scanner.nextLong();
+            System.out.print("Enter return count: ");
+            int return_count = scanner.nextInt();
+            scanner.nextLine(); // Consume newline
+
+            String updateSQL = "UPDATE criminals SET fName = ?, age = ?, status = ?, address = ?, date_admission = ?, " +
+                    "crimeID = ?, return_count = ? WHERE criminalID = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(updateSQL)) {
+                pstmt.setString(1, fName);
+                pstmt.setInt(2, age);
+                pstmt.setString(3, status);
+                pstmt.setString(4, address);
+                pstmt.setDate(5, Date.valueOf(date_admission));
+                pstmt.setLong(6, crimeID);
+                pstmt.setInt(7, return_count);
+                pstmt.setLong(8, criminalID);
+                int affectedRows = pstmt.executeUpdate();
+                if (affectedRows > 0) {
+                    logger.info("Criminal data updated successfully.");
+                } else {
+                    logger.warning("No criminal found with the provided ID.");
+                }
             }
         } catch (SQLException se) {
-            throw new SQLException("Error updating criminal data", se);
+            logger.log(Level.SEVERE, "Error updating criminal data", se);
         }
     }
-
 //    private static void deleteCriminalData(Connection conn, long criminalID) throws SQLException {
 //        String deleteSQL = "DELETE FROM criminals WHERE criminalID = ?";
 //        try (PreparedStatement pstmt = conn.prepareStatement(deleteSQL)) {
@@ -253,5 +382,6 @@ public class Main {
 //    }
 
     }
+
 
 

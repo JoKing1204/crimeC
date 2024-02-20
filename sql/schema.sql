@@ -13,6 +13,18 @@ CREATE TABLE CrimeDatabase (
                                crime VARCHAR(900)
 );
 
+CREATE TABLE UserClearance (
+                               id BIGSERIAL NOT NULL PRIMARY KEY,
+                               fName VARCHAR(30) NOT NULL,
+                               password VARCHAR(255) NOT NULL,
+                               clearance_status BOOLEAN NOT NULL
+);
+
+INSERT INTO UserClearance (fName, password, clearance_status)
+VALUES
+    ('user1', 'password1', true),
+    ('user2', 'password2', true),
+    ('user3', 'password3', true);
 
 INSERT INTO CrimeDatabase
 VALUES
